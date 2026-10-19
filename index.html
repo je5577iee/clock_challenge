@@ -1,0 +1,738 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>咕咕鐘</title>
+<!--
+  咕咕鐘：認識時鐘的小遊戲
+  - 單一 HTML 檔，完全離線可用，不引用任何外部資源
+  - 咕咕鐘小屋、小鳥「咕咕」等所有圖案皆為原創 SVG 向量圖
+  - 最佳紀錄只存在本機瀏覽器，不蒐集任何個人資料
+-->
+<style>
+:root{
+  --wall:#d6e6e1; --wall2:#c9ddd7;
+  --wood:#8a5a2e; --wood-d:#5b391b; --wood-l:#c48a4f; --plank:#ecc08c; --plank-d:#b9824a;
+  --leaf:#3f7d4e; --leaf-d:#2b5a37;
+  --dial:#fffaf0; --ink:#2b1d12; --paper:#fffdf6; --muted:#6f6355;
+  --minute:#c8323c; --hour:#2f6b45; --brass:#d9a521;
+  --good:#2f8a4f; --warm:#d9731a;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+html,body{margin:0; min-height:100%}
+body{
+  color:var(--ink);
+  font-family:system-ui,-apple-system,"PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif;
+  background:repeating-linear-gradient(90deg, var(--wall) 0 26px, var(--wall2) 26px 28px);
+  user-select:none; -webkit-user-select:none;
+}
+button{font:inherit; color:inherit; cursor:pointer; touch-action:manipulation}
+button:focus-visible{outline:3px solid var(--brass); outline-offset:3px}
+[hidden]{display:none !important}
+
+#app{max-width:1080px; margin:0 auto; padding:14px 16px 28px; min-height:100vh; display:flex; flex-direction:column}
+.screen{display:none; flex:1; flex-direction:column}
+.screen.active{display:flex}
+
+/* ---------- 木牌與按鈕 ---------- */
+.plank{
+  border:3px solid var(--ink); border-radius:12px; background:var(--plank);
+  box-shadow:0 5px 0 var(--plank-d); font-weight:900; padding:10px 16px;
+  transition:transform .06s, box-shadow .06s;
+}
+.plank:active{transform:translateY(4px); box-shadow:0 1px 0 var(--plank-d)}
+.plank.small{font-size:15px; padding:7px 12px}
+.plank.go{background:var(--leaf); color:#fff; box-shadow:0 5px 0 var(--leaf-d)}
+.plank.go:active{box-shadow:0 1px 0 var(--leaf-d)}
+
+/* 招牌：釘在牆上的木牌 */
+.sign{
+  position:relative; align-self:center; text-align:center; background:var(--wood); color:#fff7e8;
+  border:3px solid var(--ink); border-radius:10px; padding:10px 34px 12px; box-shadow:0 6px 0 var(--wood-d);
+  margin:6px 0 14px;
+}
+.sign::before,.sign::after{content:""; position:absolute; top:50%; width:9px; height:9px; margin-top:-4px; border-radius:50%; background:var(--brass); border:2px solid var(--ink)}
+.sign::before{left:11px} .sign::after{right:11px}
+.sign h1{margin:0; font-size:clamp(30px,8vw,44px); letter-spacing:6px; line-height:1.15}
+.sign p{margin:2px 0 0; font-size:15px; font-weight:700; color:#f3dcb8}
+
+/* ---------- 咕咕鐘小屋 ---------- */
+.house{display:block; width:100%; height:auto; overflow:visible}
+.house .door, .house .bird, .house .bubble, .house .pend{transform-box:view-box}
+.house .door{transform-origin:146px 58px; transition:transform .22s ease}
+.house .bird{transform-origin:170px 112px; transform:scale(0); transition:transform .35s cubic-bezier(.3,1.6,.5,1)}
+.house .bubble{opacity:0; transition:opacity .2s}
+.house.pop .door{transform:scaleX(.08)}
+.house.pop .bird{transform:scale(1.15)}
+.house.pop .bubble{opacity:1}
+.house.peek .door{transform:scaleX(.08)}
+.house.peek .bird{transform:scale(.8)}
+.house.peek .bubble{opacity:1}
+.house .pend{transform-origin:170px 412px; animation:swing 1.1s ease-in-out infinite alternate}
+@keyframes swing{from{transform:rotate(8deg)} to{transform:rotate(-8deg)}}
+.house .minring{opacity:0; transition:opacity .25s}
+.house.show-min .minring{opacity:1}
+.house .hand-hit{cursor:grab}
+.house.dragging .hand-hit{cursor:grabbing}
+.house:not(.can-set) .hand-hit{pointer-events:none}
+
+/* ---------- 首頁 ---------- */
+.home-grid{display:grid; grid-template-columns:1fr; gap:18px; align-items:start}
+.hero{max-width:340px; width:72%; margin:0 auto}
+.now{text-align:center; font-weight:900; font-size:19px; margin:4px 0 0; color:var(--wood-d)}
+.choose{background:var(--paper); border:3px solid var(--ink); border-radius:16px; padding:16px; box-shadow:0 6px 0 rgba(43,29,18,.18)}
+.choose h2{font-size:18px; margin:0 0 10px; color:var(--wood-d)}
+.choose h2 + .opts{margin-bottom:18px}
+.opts{display:grid; gap:10px}
+.opts.two{grid-template-columns:1fr 1fr}
+.opt{
+  text-align:left; border:3px solid var(--ink); border-radius:12px; background:#fff; padding:10px 12px;
+  box-shadow:0 4px 0 #d9cbb6; display:flex; gap:10px; align-items:center;
+}
+.opt:active{transform:translateY(3px); box-shadow:0 1px 0 #d9cbb6}
+.opt .t{font-size:19px; font-weight:900; display:block}
+.opt .d{font-size:14px; font-weight:700; color:var(--muted); display:block; margin-top:2px}
+.opt .badge{margin-left:auto; font-size:13px; font-weight:900; color:var(--wood-d); background:#f6e6cf; border-radius:999px; padding:3px 9px; white-space:nowrap}
+.opt svg{flex-shrink:0}
+.opt[aria-pressed="true"]{background:#e6f2e9; border-color:var(--leaf-d); box-shadow:0 4px 0 var(--leaf)}
+.opt[aria-pressed="true"] .t{color:var(--leaf-d)}
+.start{width:100%; font-size:22px; padding:14px; margin-top:4px}
+.toggles{display:flex; gap:10px; justify-content:center; margin-top:16px; flex-wrap:wrap}
+
+/* ---------- 遊戲 ---------- */
+.bar{display:flex; align-items:center; justify-content:space-between; gap:8px 10px; flex-wrap:wrap}
+@media (max-width:520px){ body.zy-on .bar .pins{order:3; width:100%} }
+.pins{display:flex; gap:4px; justify-content:center}
+.bar .plank{white-space:nowrap}
+.pins i{width:12px; height:12px; flex-shrink:0; border-radius:50%; border:2px solid var(--ink); background:#fff; display:block}
+.pins i.ok{background:var(--good)} .pins i.half{background:var(--brass)} .pins i.miss{background:#d9cbb6}
+.pins i.now{transform:scale(1.25); background:var(--plank)}
+.tagline{font-weight:900; font-size:14px; background:var(--wood); color:#fff7e8; border:2.5px solid var(--ink); border-radius:8px; padding:4px 10px; white-space:nowrap}
+.play{display:grid; grid-template-columns:1fr; gap:14px; margin-top:12px; align-items:start}
+.stage{max-width:330px; width:78%; margin:0 auto}
+.panel{background:var(--paper); border:3px solid var(--ink); border-radius:16px; padding:16px; box-shadow:0 6px 0 rgba(43,29,18,.18); text-align:center}
+.prompt{font-size:20px; font-weight:900; margin:0 0 10px}
+.target{font-size:clamp(34px,9vw,48px); font-weight:900; margin:0 0 12px; font-variant-numeric:tabular-nums; color:var(--wood-d)}
+.answers{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+.answers button{
+  border:3px solid var(--ink); border-radius:12px; background:#fff; box-shadow:0 5px 0 #d9cbb6;
+  font-size:clamp(20px,5.4vw,26px); font-weight:900; padding:14px 6px; font-variant-numeric:tabular-nums;
+}
+.answers button:active{transform:translateY(4px); box-shadow:0 1px 0 #d9cbb6}
+.answers button.right{background:var(--good); color:#fff; box-shadow:0 5px 0 #1f6036}
+.answers button.wrong{background:#f7d9b8; color:#8a4a10; box-shadow:0 5px 0 #d9a066; opacity:.75}
+.answers button:disabled{cursor:default}
+.adjust{display:grid; grid-template-columns:auto 1fr auto; gap:8px 10px; align-items:center; max-width:360px; margin:0 auto 12px}
+.adjust .lab{font-weight:900; font-size:17px; text-align:center}
+.adjust .lab.h{color:var(--hour)} .adjust .lab.m{color:var(--minute)}
+.adjust button{width:56px; height:48px; font-size:24px; padding:0}
+.set-go{width:100%; max-width:360px; font-size:20px}
+.feedback{min-height:30px; font-size:21px; font-weight:900; margin-top:12px}
+.feedback.good{color:var(--good)} .feedback.warm{color:var(--warm)}
+.hint{margin-top:8px; font-size:17px; font-weight:700; line-height:1.7; text-align:left; background:#f6efe2; border-radius:12px; padding:10px 12px}
+.hint:empty{display:none}
+.hint .h{color:var(--hour); font-weight:900} .hint .m{color:var(--minute); font-weight:900}
+.next{margin-top:14px; font-size:19px}
+
+/* ---------- 結果 ---------- */
+.result{max-width:560px; margin:10px auto 0; width:100%}
+.stars{display:flex; justify-content:center; gap:8px; margin:6px 0}
+.stars svg{width:54px; height:54px}
+.r-title{font-size:30px; font-weight:900; margin:4px 0; color:var(--wood-d)}
+.r-line{font-size:18px; font-weight:800; color:var(--muted)}
+.miss-list{margin-top:16px; text-align:left}
+.miss-list h3{font-size:17px; margin:0 0 10px}
+.minis{display:flex; flex-wrap:wrap; gap:12px; justify-content:center}
+.mini{display:flex; flex-direction:column; align-items:center; gap:4px; font-weight:900; font-size:15px}
+.mini svg{width:76px; height:76px}
+.r-btns{display:flex; gap:12px; margin-top:20px}
+.r-btns .plank{flex:1; font-size:19px}
+
+/* ---------- 注音（直式，跟國語課本一樣） ---------- */
+.zc{display:inline-flex; align-items:center; white-space:nowrap; text-indent:0}
+.zp{position:relative; display:inline-flex; flex-direction:column; align-items:center; justify-content:center;
+  font-size:max(.32em, 8px); line-height:1.05; letter-spacing:0; margin:0 .6em 0 .12em; font-weight:700}
+.zp i{display:block; font-style:normal}
+.zp .tn{position:absolute; left:100%; bottom:.15em; margin-left:.05em}
+.zp .lt{position:absolute; top:-.9em; left:0; right:0; text-align:center}
+body.zy-on .hint{line-height:2.2}
+body.zy-on .opt .d{font-size:15px}
+body.zy-on .sign h1{letter-spacing:2px}
+
+/* ---------- 寬螢幕：時鐘在左、題目在右 ---------- */
+@media (min-width:860px){
+  .home-grid{grid-template-columns:1fr 1.1fr; gap:28px; margin-top:6px}
+  .hero{width:100%}
+  .play{grid-template-columns:1fr 1.1fr; gap:28px}
+  .stage{width:100%; max-width:380px}
+}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation:none !important; transition:none !important}
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- 首頁 -->
+  <section id="home" class="screen active">
+    <div class="sign"><h1 data-zy="">咕咕鐘</h1><p data-zy="">一起認識時鐘</p></div>
+    <div class="home-grid">
+      <div>
+        <div class="hero" id="heroClock"></div>
+        <p class="now" id="nowText"></p>
+      </div>
+      <div class="choose">
+        <h2 data-zy="">怎麼玩？</h2>
+        <div class="opts two" id="modeOpts"></div>
+        <h2 data-zy="">選難度</h2>
+        <div class="opts" id="levelOpts"></div>
+        <button class="plank go start" id="startBtn" data-zy="">開始</button>
+        <div class="toggles">
+          <button class="plank small" id="soundBtn"></button>
+          <button class="plank small" id="zyBtn"></button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 遊戲 -->
+  <section id="game" class="screen">
+    <div class="bar">
+      <button class="plank small" id="backBtn" data-zy="">回首頁</button>
+      <div class="pins" id="pins"></div>
+      <span class="tagline" id="tagline"></span>
+    </div>
+    <div class="play">
+      <div class="stage" id="stage"></div>
+      <div class="panel">
+        <p class="prompt" id="prompt"></p>
+        <div class="target" id="target" hidden></div>
+        <div class="answers" id="answers"></div>
+        <div id="setBox" hidden>
+          <div class="adjust">
+            <button class="plank" id="hMinus" aria-label="短針往回">−</button><span class="lab h" id="labH"></span><button class="plank" id="hPlus" aria-label="短針往前">＋</button>
+            <button class="plank" id="mMinus" aria-label="長針往回">−</button><span class="lab m" id="labM"></span><button class="plank" id="mPlus" aria-label="長針往前">＋</button>
+          </div>
+          <button class="plank go set-go" id="setGo" data-zy="">撥好了</button>
+        </div>
+        <div class="feedback" id="feedback"></div>
+        <div class="hint" id="hint"></div>
+        <button class="plank go next" id="nextBtn" hidden></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 結果 -->
+  <section id="result" class="screen">
+    <div class="panel result" id="resultBox"></div>
+  </section>
+
+</div>
+
+<script>
+/* =====================================================================
+   設定區
+   ===================================================================== */
+const TOTAL = 10;   // 一回幾題
+const LEVELS = {
+  easy: { name:'簡單', desc:'整點和半點', step:30 },
+  mid:  { name:'進階', desc:'5 分 5 分看', step:5 },
+  hard: { name:'困難', desc:'1 分 1 分看', step:1 }
+};
+const MODES = {
+  read: { name:'看時鐘', desc:'看指針，選出時間' },
+  set:  { name:'撥時鐘', desc:'把指針撥到對的時間' }
+};
+const PRAISE  = ['咕咕！答對了！','太棒了！','你會看時鐘了！','完全正確！'];
+const COMFORT = ['沒關係！','差一點點！','加油，你可以的！','再看一次！'];
+
+/* ===== 小工具 ===== */
+const $ = function(id){ return document.getElementById(id); };
+function pick(a){ return a[Math.floor(Math.random()*a.length)]; }
+function randInt(a,b){ return a + Math.floor(Math.random()*(b-a+1)); }
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
+function wrapH(h){ return ((h-1)%12+12)%12+1; }
+function fmt(h,m){ return m===0 ? h+' 時' : h+' 時 '+m+' 分'; }
+function show(id){ document.querySelectorAll('.screen').forEach(function(s){ s.classList.toggle('active', s.id===id); }); window.scrollTo(0,0); }
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ===== 儲存（只存在這台裝置） ===== */
+const store = (function(){
+  try{ const s = JSON.parse(localStorage.getItem('cuckoo-clock')); if(s) return s; }catch(e){}
+  return { mode:'read', level:'easy', zhuyin:false, best:{} };
+})();
+function save(){ try{ localStorage.setItem('cuckoo-clock', JSON.stringify(store)); }catch(e){} }
+
+/* =====================================================================
+   咕咕鐘小屋（原創向量圖）
+   時鐘中心 (170, 270)，半徑 112
+   ===================================================================== */
+const CX = 170, CY = 270;
+function polar(r, deg){ const a = (deg-90)*Math.PI/180; return [CX + r*Math.cos(a), CY + r*Math.sin(a)]; }
+
+function dialSVG(){
+  let s = '';
+  for(let i=0;i<60;i++){
+    const big = i%5===0, p1 = polar(big?92:98, i*6), p2 = polar(104, i*6);
+    s += '<line x1="'+p1[0].toFixed(1)+'" y1="'+p1[1].toFixed(1)+'" x2="'+p2[0].toFixed(1)+'" y2="'+p2[1].toFixed(1)+'" stroke="#2b1d12" stroke-width="'+(big?3.5:1.4)+'" stroke-linecap="round"/>';
+  }
+  for(let n=1;n<=12;n++){
+    const p = polar(76, n*30);
+    s += '<text x="'+p[0].toFixed(1)+'" y="'+(p[1]+8).toFixed(1)+'" text-anchor="middle" font-family="Georgia,\'Times New Roman\',serif" font-weight="700" font-size="24" fill="#2b1d12">'+n+'</text>';
+  }
+  /* 提示用：外圈的分鐘數 5、10、15…… */
+  let r = '<g class="minring">';
+  for(let n=1;n<=12;n++){
+    const p = polar(124, n*30), v = (n*5)%60;
+    r += '<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="11" fill="#c8323c"/>'
+       + '<text x="'+p[0].toFixed(1)+'" y="'+(p[1]+4.5).toFixed(1)+'" text-anchor="middle" font-size="12.5" font-weight="900" fill="#fff" font-family="system-ui,sans-serif">'+(v===0?'0':v)+'</text>';
+  }
+  return s + r + '</g>';
+}
+
+function houseSVG(){
+  let leaves = '';
+  for(let i=0;i<9;i++){
+    const t = i/8, xl = 26 + t*144, yl = 152 - t*124, xr = 314 - t*144;
+    leaves += '<ellipse cx="'+xl.toFixed(1)+'" cy="'+yl.toFixed(1)+'" rx="16" ry="9" transform="rotate(-40 '+xl.toFixed(1)+' '+yl.toFixed(1)+')" fill="#3f7d4e" stroke="#2b1d12" stroke-width="2.5"/>';
+    leaves += '<ellipse cx="'+xr.toFixed(1)+'" cy="'+yl.toFixed(1)+'" rx="16" ry="9" transform="rotate(40 '+xr.toFixed(1)+' '+yl.toFixed(1)+')" fill="#4f9460" stroke="#2b1d12" stroke-width="2.5"/>';
+  }
+  return '<svg class="house" viewBox="0 0 340 480" role="img" aria-label="咕咕鐘">'
+    /* 鍊子與松果砝碼 */
+    + '<g stroke="#2b1d12" stroke-width="2.5">'
+    +   '<line x1="122" y1="400" x2="122" y2="438"/><line x1="218" y1="400" x2="218" y2="452"/>'
+    +   '<ellipse cx="122" cy="452" rx="11" ry="17" fill="#8a5a2e"/><ellipse cx="218" cy="466" rx="11" ry="17" fill="#8a5a2e"/>'
+    +   '<path d="M113 446h18M113 456h18M209 460h18M209 470h18" stroke="#5b391b"/>'
+    + '</g>'
+    /* 鐘擺 */
+    + '<g class="pend"><line x1="170" y1="404" x2="170" y2="452" stroke="#2b1d12" stroke-width="4"/><circle cx="170" cy="458" r="15" fill="#d9a521" stroke="#2b1d12" stroke-width="3"/><circle cx="165" cy="453" r="4" fill="#fff3c2"/></g>'
+    /* 小屋 */
+    + '<rect x="44" y="138" width="252" height="270" rx="10" fill="#8a5a2e" stroke="#2b1d12" stroke-width="4"/>'
+    + '<path d="M58 160v234M282 160v234" stroke="#6f4522" stroke-width="3"/>'
+    + '<rect x="30" y="392" width="280" height="20" rx="6" fill="#5b391b" stroke="#2b1d12" stroke-width="4"/>'
+    /* 屋頂 */
+    + '<path d="M14 156 L170 18 L326 156 Z" fill="#c48a4f" stroke="#2b1d12" stroke-width="4" stroke-linejoin="round"/>'
+    + leaves
+    /* 小門與小鳥咕咕 */
+    + '<rect x="138" y="52" width="64" height="70" rx="6" fill="#2b1d12"/>'
+    + '<g class="bird">'
+    +   '<path d="M150 98 q-14 -6 -12 -22 q10 6 16 14z" fill="#9e2430" stroke="#2b1d12" stroke-width="2"/>'
+    +   '<circle cx="170" cy="96" r="22" fill="#c8323c" stroke="#2b1d12" stroke-width="3"/>'
+    +   '<ellipse cx="172" cy="104" rx="13" ry="11" fill="#fde8c8"/>'
+    +   '<path d="M162 76 q4 -10 10 -2 q4 -9 9 0" fill="none" stroke="#2b1d12" stroke-width="3" stroke-linecap="round"/>'
+    +   '<path d="M161 92 q4 -4 8 0M175 92 q4 -4 8 0" fill="none" stroke="#2b1d12" stroke-width="2.6" stroke-linecap="round"/>'
+    +   '<path d="M167 98 l11 0 l-5.5 8z" fill="#f2a31b" stroke="#2b1d12" stroke-width="2" stroke-linejoin="round"/>'
+    +   '<circle cx="158" cy="100" r="3.2" fill="#ff8a8a" opacity=".8"/><circle cx="186" cy="100" r="3.2" fill="#ff8a8a" opacity=".8"/>'
+    + '</g>'
+    + '<g class="door"><rect x="140" y="54" width="60" height="66" rx="5" fill="#c48a4f" stroke="#2b1d12" stroke-width="3"/><circle cx="190" cy="88" r="3.5" fill="#d9a521" stroke="#2b1d12" stroke-width="1.5"/></g>'
+    + '<g class="bubble"><path d="M214 52 h82 a10 10 0 0 1 10 10 v26 a10 10 0 0 1 -10 10 h-70 l-14 12 l2 -12 a10 10 0 0 1 -10 -10 v-26 a10 10 0 0 1 10 -10z" fill="#fff" stroke="#2b1d12" stroke-width="3"/>'
+    +   '<text class="say" x="257" y="82" text-anchor="middle" font-size="19" font-weight="900" fill="#2b1d12" font-family="system-ui,\'PingFang TC\',\'Microsoft JhengHei\',sans-serif">咕咕！</text></g>'
+    /* 鐘面 */
+    + '<circle cx="170" cy="270" r="118" fill="#c48a4f" stroke="#2b1d12" stroke-width="4"/>'
+    + '<circle cx="170" cy="270" r="108" fill="#fffaf0" stroke="#2b1d12" stroke-width="3"/>'
+    + dialSVG()
+    /* 指針：短針綠色看「時」，長針紅色看「分」 */
+    + '<g class="hand-h"><line x1="170" y1="282" x2="170" y2="212" stroke="#2f6b45" stroke-width="11" stroke-linecap="round"/><line class="hand-hit" data-hand="h" x1="170" y1="270" x2="170" y2="208" stroke="transparent" stroke-width="30" stroke-linecap="round"/></g>'
+    + '<g class="hand-m"><line x1="170" y1="286" x2="170" y2="178" stroke="#c8323c" stroke-width="6.5" stroke-linecap="round"/><circle cx="170" cy="180" r="4" fill="#c8323c"/><line class="hand-hit" data-hand="m" x1="170" y1="250" x2="170" y2="170" stroke="transparent" stroke-width="30" stroke-linecap="round"/></g>'
+    + '<circle cx="170" cy="270" r="9" fill="#d9a521" stroke="#2b1d12" stroke-width="3"/>'
+    + '</svg>';
+}
+
+/* 把時鐘指到 h 時 m 分（短針會隨著分鐘慢慢走，跟真的時鐘一樣） */
+function setHands(svg, h, m){
+  svg.querySelector('.hand-h').setAttribute('transform', 'rotate('+((h%12 + m/60)*30)+' '+CX+' '+CY+')');
+  svg.querySelector('.hand-m').setAttribute('transform', 'rotate('+(m*6)+' '+CX+' '+CY+')');
+}
+function birdSay(svg, text, cls){
+  svg.querySelector('.say').textContent = text;
+  svg.classList.remove('pop','peek'); void svg.getBoundingClientRect();
+  svg.classList.add(cls);
+  clearTimeout(svg._t);
+  svg._t = setTimeout(function(){ svg.classList.remove('pop','peek'); }, cls==='pop' ? 1500 : 1800);
+}
+
+/* 結果頁的小時鐘 */
+function miniClock(h, m){
+  let t = '';
+  for(let n=0;n<12;n++){ const a=(n*30-90)*Math.PI/180; t += '<line x1="'+(50+38*Math.cos(a)).toFixed(1)+'" y1="'+(50+38*Math.sin(a)).toFixed(1)+'" x2="'+(50+44*Math.cos(a)).toFixed(1)+'" y2="'+(50+44*Math.sin(a)).toFixed(1)+'" stroke="#2b1d12" stroke-width="'+(n%3===0?3:1.6)+'"/>'; }
+  return '<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="47" fill="#fffaf0" stroke="#2b1d12" stroke-width="4"/>'+t
+    + '<line x1="50" y1="50" x2="50" y2="26" stroke="#2f6b45" stroke-width="6" stroke-linecap="round" transform="rotate('+((h%12+m/60)*30)+' 50 50)"/>'
+    + '<line x1="50" y1="50" x2="50" y2="12" stroke="#c8323c" stroke-width="3.5" stroke-linecap="round" transform="rotate('+(m*6)+' 50 50)"/>'
+    + '<circle cx="50" cy="50" r="4.5" fill="#d9a521" stroke="#2b1d12" stroke-width="1.5"/></svg>';
+}
+function starSVG(on){ return '<svg viewBox="0 0 24 24"><path d="M12 2.2l2.95 6.1 6.7.85-4.95 4.6 1.3 6.65L12 17.1l-5.95 3.3 1.3-6.65L2.4 9.15l6.7-.85z" fill="'+(on?'#d9a521':'#e8dccb')+'" stroke="#2b1d12" stroke-width="1.6" stroke-linejoin="round"/></svg>'; }
+
+/* ===== 音效：瀏覽器內建合成 ===== */
+let ac = null, soundOn = true;
+function tone(freqs, dur, type, gap){
+  if(!soundOn) return;
+  try{
+    ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+    freqs.forEach(function(f,i){
+      const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime + i*(gap||dur);
+      o.type = type||'sine'; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.22, t+0.02); g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+      o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t+dur+0.02);
+    });
+  }catch(e){}
+}
+function sCuckoo(){ tone([784,622,784,622], 0.22, 'sine', 0.26); }   // 咕咕、咕咕
+function sSoft(){ tone([392,349], 0.14, 'triangle'); }
+function sTick(){ tone([1200], 0.03, 'square'); }
+
+/* =====================================================================
+   注音：ZY 由產生器填入（臺灣國語課本讀音），破音字依詞語另外標
+   ===================================================================== */
+const ZY = {"一": "ㄧ", "三": "ㄙㄢ", "上": "ㄕㄤˋ", "下": "ㄒㄧㄚˋ", "不": "ㄅㄨˋ", "中": "ㄓㄨㄥ", "了": "˙ㄌㄜ", "二": "ㄦˋ", "人": "ㄖㄣˊ", "以": "ㄧˇ", "你": "ㄋㄧˇ", "係": "ㄒㄧˋ", "個": "ㄍㄜˋ", "全": "ㄑㄩㄢˊ", "其": "ㄑㄧˊ", "再": "ㄗㄞˋ", "出": "ㄔㄨ", "分": "ㄈㄣ", "到": "ㄉㄠˋ", "前": "ㄑㄧㄢˊ", "加": "ㄐㄧㄚ", "午": "ㄨˇ", "半": "ㄅㄢˋ", "厲": "ㄌㄧˋ", "反": "ㄈㄢˇ", "可": "ㄎㄜˇ", "和": "ㄏㄢˋ", "咕": "ㄍㄨ", "喔": "ㄛ", "單": "ㄉㄢ", "回": "ㄏㄨㄟˊ", "因": "ㄧㄣ", "困": "ㄎㄨㄣˋ", "圈": "ㄑㄩㄢ", "在": "ㄗㄞˋ", "地": "ㄉㄧˋ", "外": "ㄨㄞˋ", "多": "ㄉㄨㄛ", "太": "ㄊㄞˋ", "好": "ㄏㄠˇ", "始": "ㄕˇ", "字": "ㄗˋ", "完": "ㄨㄢˊ", "害": "ㄏㄞˋ", "對": "ㄉㄨㄟˋ", "小": "ㄒㄧㄠˇ", "就": "ㄐㄧㄡˋ", "差": "ㄔㄚ", "己": "ㄐㄧˇ", "年": "ㄋㄧㄢˊ", "幾": "ㄐㄧˇ", "度": "ㄉㄨˋ", "往": "ㄨㄤˇ", "很": "ㄏㄣˇ", "怎": "ㄗㄣˇ", "戰": "ㄓㄢˋ", "所": "ㄙㄨㄛˇ", "才": "ㄘㄞˊ", "找": "ㄓㄠˇ", "把": "ㄅㄚˇ", "指": "ㄓˇ", "挑": "ㄊㄧㄠ", "提": "ㄊㄧˊ", "撥": "ㄅㄛ", "效": "ㄒㄧㄠˋ", "整": "ㄓㄥˇ", "數": "ㄕㄨˇ", "方": "ㄈㄤ", "是": "ㄕˋ", "時": "ㄕˊ", "會": "ㄏㄨㄟˋ", "果": "ㄍㄨㄛˇ", "格": "ㄍㄜˊ", "案": "ㄢˋ", "棒": "ㄅㄤˋ", "次": "ㄘˋ", "正": "ㄓㄥˋ", "比": "ㄅㄧˇ", "沒": "ㄇㄟˊ", "油": "ㄧㄡˊ", "注": "ㄓㄨˋ", "為": "ㄨㄟˋ", "玩": "ㄨㄢˊ", "現": "ㄒㄧㄢˋ", "的": "˙ㄉㄜ", "看": "ㄎㄢˋ", "短": "ㄉㄨㄢˇ", "確": "ㄑㄩㄝˋ", "示": "ㄕˋ", "答": "ㄉㄚˊ", "簡": "ㄐㄧㄢˇ", "紅": "ㄏㄨㄥˊ", "級": "ㄐㄧˊ", "結": "ㄐㄧㄝˊ", "綠": "ㄌㄩˋ", "自": "ㄗˋ", "色": "ㄙㄜˋ", "著": "˙ㄓㄜ", "要": "ㄧㄠˋ", "試": "ㄕˋ", "認": "ㄖㄣˋ", "調": "ㄊㄧㄠˊ", "識": "ㄕˋ", "走": "ㄗㄡˇ", "起": "ㄑㄧˇ", "較": "ㄐㄧㄠˋ", "這": "ㄓㄜˋ", "進": "ㄐㄧㄣˋ", "過": "ㄍㄨㄛˋ", "達": "ㄉㄚˊ", "選": "ㄒㄩㄢˇ", "還": "ㄏㄞˊ", "針": "ㄓㄣ", "錯": "ㄘㄨㄛˋ", "鐘": "ㄓㄨㄥ", "長": "ㄔㄤˊ", "開": "ㄎㄞ", "間": "ㄐㄧㄢ", "關": "ㄍㄨㄢ", "階": "ㄐㄧㄝ", "難": "ㄋㄢˊ", "音": "ㄧㄣ", "頁": "ㄧㄝˋ", "題": "ㄊㄧˊ", "首": "ㄕㄡˇ", "麼": "˙ㄇㄜ", "點": "ㄉㄧㄢˇ", "綜": "ㄗㄨㄥˋ"};
+const ZY_WORDS = {"朋友": ["ㄆㄥˊ", "˙ㄧㄡ"], "起來": ["ㄑㄧˇ", "˙ㄌㄞ"], "出來": ["ㄔㄨ", "˙ㄌㄞ"], "關係": ["ㄍㄨㄢ", "˙ㄒㄧ"]};
+function rubyOf(c, z){
+  let light = false, toneMark = '';
+  if(z.charAt(0)==='˙'){ light = true; z = z.slice(1); }
+  if('ˊˇˋ'.indexOf(z.charAt(z.length-1)) >= 0){ toneMark = z.charAt(z.length-1); z = z.slice(0,-1); }
+  let col = '';
+  for(let k=0;k<z.length;k++){ const ch = z.charAt(k); col += '<i>'+ch+'</i>'; }
+  return '<span class="zc">'+c+'<span class="zp">'+(light?'<i class="lt">˙</i>':'')+col+(toneMark?'<i class="tn">'+toneMark+'</i>':'')+'</span></span>';
+}
+function zy(str){
+  return String(str).split(/(<[^>]*>)/).map(function(part){
+    if(part.charAt(0)==='<') return part;
+    let out = '', i = 0;
+    while(i < part.length){
+      let hit = null;
+      for(const w in ZY_WORDS){ if(part.substr(i,w.length)===w){ hit = w; break; } }
+      if(hit){ for(let k=0;k<hit.length;k++) out += rubyOf(hit[k], ZY_WORDS[hit][k]); i += hit.length; continue; }
+      const c = part[i]; out += ZY[c] ? rubyOf(c, ZY[c]) : c; i++;
+    }
+    return out;
+  }).join('');
+}
+function Z(str){ return store.zhuyin ? zy(str) : str; }
+function applyStaticZy(){
+  document.querySelectorAll('[data-zy]').forEach(function(el){
+    if(!el.dataset.zy) el.dataset.zy = el.textContent.trim();
+    el.innerHTML = Z(el.dataset.zy);
+  });
+}
+
+/* =====================================================================
+   首頁：現在的時間、選玩法和難度
+   ===================================================================== */
+$('heroClock').innerHTML = houseSVG();
+const hero = $('heroClock').querySelector('svg');
+function tickNow(){
+  const d = new Date(), h = d.getHours(), m = d.getMinutes();
+  setHands(hero, h, m);
+  $('nowText').innerHTML = Z('現在是' + (h < 12 ? '上午 ' : '下午 ') + fmt(h%12 || 12, m));
+}
+hero.addEventListener('click', function(){ birdSay(hero, '咕咕！', 'pop'); sCuckoo(); });
+
+function renderHome(){
+  $('modeOpts').innerHTML = Object.keys(MODES).map(function(k){
+    const ic = k==='read'
+      ? '<svg width="34" height="34" viewBox="0 0 34 34"><circle cx="17" cy="17" r="14" fill="#fffaf0" stroke="#2b1d12" stroke-width="3"/><path d="M17 17V8" stroke="#c8323c" stroke-width="3" stroke-linecap="round"/><path d="M17 17l6 4" stroke="#2f6b45" stroke-width="4" stroke-linecap="round"/></svg>'
+      : '<svg width="34" height="34" viewBox="0 0 34 34"><circle cx="17" cy="17" r="14" fill="#fffaf0" stroke="#2b1d12" stroke-width="3"/><path d="M17 17l8 -5" stroke="#c8323c" stroke-width="3" stroke-linecap="round"/><path d="M26 6a14 14 0 0 1 5 8" fill="none" stroke="#2b1d12" stroke-width="2.5" stroke-linecap="round"/><path d="M31 9l0 5-5 0" fill="none" stroke="#2b1d12" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    return '<button class="opt" data-mode="'+k+'" aria-pressed="'+(store.mode===k)+'">'+ic+'<span><span class="t">'+Z(MODES[k].name)+'</span><span class="d">'+Z(MODES[k].desc)+'</span></span></button>';
+  }).join('');
+  $('levelOpts').innerHTML = Object.keys(LEVELS).map(function(k){
+    const L = LEVELS[k], b = store.best[store.mode+'-'+k];
+    const starLine = b ? '<span class="badge">'+'★'.repeat(b)+'☆'.repeat(3-b)+'</span>' : '';
+    return '<button class="opt" data-level="'+k+'" aria-pressed="'+(store.level===k)+'"><span><span class="t">'+Z(L.name)+'</span><span class="d">'+Z(L.desc)+'</span></span>'+starLine+'</button>';
+  }).join('');
+  document.querySelectorAll('[data-mode]').forEach(function(b){ b.onclick = function(){ store.mode = b.dataset.mode; save(); renderHome(); }; });
+  document.querySelectorAll('[data-level]').forEach(function(b){ b.onclick = function(){ store.level = b.dataset.level; save(); renderHome(); }; });
+  $('soundBtn').innerHTML = Z('音效：' + (soundOn ? '開' : '關'));
+  $('zyBtn').innerHTML = 'ㄅ ' + Z('注音：' + (store.zhuyin ? '開' : '關'));
+  tickNow();
+}
+$('soundBtn').onclick = function(){ soundOn = !soundOn; renderHome(); };
+$('zyBtn').onclick = function(){ store.zhuyin = !store.zhuyin; save(); refreshZy(); };
+function refreshZy(){ document.body.classList.toggle('zy-on', !!store.zhuyin); applyStaticZy(); renderHome(); }
+
+/* =====================================================================
+   出題
+   ===================================================================== */
+$('stage').innerHTML = houseSVG();
+const clock = $('stage').querySelector('svg');
+let mode, level, qi, q, used, results, locked, setH, setM, timers = [];
+function later(fn, ms){ timers.push(setTimeout(fn, ms)); }
+function clearTimers(){ timers.forEach(clearTimeout); timers = []; }
+
+function genTime(){
+  let h, m, key, n = 0;
+  do{
+    h = randInt(1,12);
+    if(level==='easy') m = pick([0,30]);
+    else if(level==='mid') m = randInt(0,11)*5;
+    else m = Math.random() < 0.3 ? randInt(45,59) : randInt(0,59);   // 困難：常出「快到整點」的題目
+    key = h+':'+m;
+  }while(used.has(key) && ++n < 50);
+  used.add(key);
+  return { h:h, m:m };
+}
+
+/* 錯誤選項故意用小朋友常犯的錯，答錯時就能針對那個錯給提示 */
+function makeOptions(t){
+  const list = [{ h:t.h, m:t.m, type:'ok' }];
+  function add(h, m, type){
+    h = wrapH(h);
+    if(m < 0 || m > 59) return;
+    if(!list.some(function(o){ return o.h===h && o.m===m; })) list.push({ h:h, m:m, type:type });
+  }
+  if(level==='easy'){
+    add(t.h, t.m===0 ? 30 : 0, 'half');
+    if(t.m===30) add(t.h+1, 30, 'near');
+    add(t.h+1, t.m, 'next'); add(t.h-1, t.m, 'prev');
+  }else{
+    if(t.m >= 30) add(t.h+1, t.m, 'near');                                  // 快到整點：看成下一個時
+    if(t.m%5===0 && t.m>0){ add(t.m/5, (t.h%12)*5, 'swap'); add(t.h, t.m/5, 'count'); }   // 長短針看反、分鐘直接看數字
+    const d = level==='mid' ? 5 : 1;
+    add(t.h, t.m+d, 'close'); add(t.h, t.m-d, 'close');
+    add(t.h-1, t.m, 'prev');
+  }
+  let n = 0;
+  while(list.length < 4 && n++ < 50) add(randInt(1,12), level==='easy' ? pick([0,30]) : level==='mid' ? randInt(0,11)*5 : randInt(0,59), 'close');
+  return shuffle(list.slice(0,4));
+}
+function nextH(h){ return wrapH(h+1); }
+
+/* ===== 提示 ===== */
+const LEGEND = '<span class="h">短針（綠色）</span>指著幾，就是幾時；<span class="m">長針（紅色）</span>指著的地方，看外圈的紅色數字就是幾分。';
+function readHint(t, type){
+  switch(type){
+    case 'near':  return '<span class="h">短針</span>還沒走到 '+nextH(t.h)+'，所以還是 '+t.h+' 時喔！';
+    case 'swap':  return '<span class="h">短針</span>比較短，看「時」；<span class="m">長針</span>比較長，看「分」。不要看反了！';
+    case 'count': return '<span class="m">長針</span>指著 '+(t.m/5)+'，可是要 5 個 5 個數：5、10、15……，看外圈的紅色數字。';
+    case 'half':  return '<span class="m">長針</span>指著 12 是整點；<span class="m">長針</span>指著 6，是過了半圈，就是 30 分。';
+    default:      return LEGEND;
+  }
+}
+function setHint(t){
+  const tips = [];
+  if(setH !== t.h){
+    tips.push(t.m===0 ? '<span class="h">短針</span>要指著 '+t.h+'。'
+      : '<span class="h">短針</span>要在 '+t.h+' 和 '+nextH(t.h)+' 的中間，因為過了 '+t.h+' 時，還沒到 '+nextH(t.h)+' 時。');
+  }
+  if(setM !== t.m){
+    tips.push(t.m===0 ? '<span class="m">長針</span>要指著 12，才是整點。'
+      : '<span class="m">長針</span>要指到外圈紅色數字的 '+(t.m%5===0 ? t.m : (t.m-t.m%5)+' 再走 '+(t.m%5)+' 小格')+'。');
+  }
+  return tips.join('<br>');
+}
+
+/* =====================================================================
+   遊戲流程
+   ===================================================================== */
+function startGame(){
+  mode = store.mode; level = store.level;
+  qi = 0; used = new Set(); results = []; clearTimers();
+  $('tagline').innerHTML = Z(MODES[mode].name + '・' + LEVELS[level].name);
+  clock.classList.toggle('can-set', mode==='set');
+  show('game');
+  nextQ();
+}
+
+function renderPins(){
+  let s = '';
+  for(let i=0;i<TOTAL;i++){
+    const r = results[i];
+    s += '<i class="'+(r==='ok'?'ok':r==='half'?'half':r==='miss'?'miss':(i===qi?'now':''))+'"></i>';
+  }
+  $('pins').innerHTML = s;
+}
+
+function nextQ(){
+  if(qi >= TOTAL){ finish(); return; }
+  q = genTime(); q.retry = false; locked = false;
+  clock.classList.remove('show-min','pop','peek');
+  $('feedback').className = 'feedback'; $('feedback').textContent = '';
+  $('hint').innerHTML = ''; $('nextBtn').hidden = true;
+  renderPins();
+  if(mode==='read'){
+    setHands(clock, q.h, q.m);
+    $('prompt').innerHTML = Z('時鐘上是幾時幾分？');
+    $('target').hidden = true; $('setBox').hidden = true; $('answers').hidden = false;
+    $('answers').innerHTML = makeOptions(q).map(function(o){
+      return '<button data-h="'+o.h+'" data-m="'+o.m+'" data-type="'+o.type+'">'+Z(fmt(o.h,o.m))+'</button>';
+    }).join('');
+    Array.from($('answers').children).forEach(function(b){ b.onclick = function(){ answerRead(b); }; });
+  }else{
+    setH = 12; setM = 0; setHands(clock, setH, setM);
+    $('prompt').innerHTML = Z('把時鐘撥到');
+    $('target').hidden = false; $('target').innerHTML = Z(fmt(q.h, q.m));
+    $('answers').hidden = true; $('setBox').hidden = false;
+    updateSetLabels();
+  }
+}
+
+/* ----- 看時鐘選時間 ----- */
+function answerRead(btn){
+  if(locked) return;
+  const ok = +btn.dataset.h===q.h && +btn.dataset.m===q.m;
+  if(ok){ win(btn); return; }
+  btn.classList.add('wrong'); btn.disabled = true;
+  if(!q.retry){
+    q.retry = true;
+    oops(pick(COMFORT) + '看看提示，再試一次！', readHint(q, btn.dataset.type));
+  }else{
+    lose();
+  }
+}
+
+/* ----- 撥時鐘 ----- */
+function updateSetLabels(){
+  $('labH').innerHTML = Z('短針：' + setH + ' 時');
+  $('labM').innerHTML = Z('長針：' + setM + ' 分');
+}
+function moveMinute(newM){
+  if(newM === setM) return;
+  if(setM >= 45 && newM <= 15) setH = wrapH(setH+1);      // 長針往前走過 12，短針跟著進一個時
+  else if(setM <= 15 && newM >= 45) setH = wrapH(setH-1); // 長針往回走過 12
+  setM = newM; setHands(clock, setH, setM); updateSetLabels(); sTick();
+}
+function stepMinute(dir){
+  if(locked) return;
+  const st = LEVELS[level].step;
+  let m = setM + dir*st;
+  if(m >= 60){ m -= 60; setH = wrapH(setH+1); }
+  else if(m < 0){ m += 60; setH = wrapH(setH-1); }
+  setM = m; setHands(clock, setH, setM); updateSetLabels(); sTick();
+}
+function stepHour(dir){ if(locked) return; setH = wrapH(setH+dir); setHands(clock, setH, setM); updateSetLabels(); sTick(); }
+$('hMinus').onclick = function(){ stepHour(-1); };
+$('hPlus').onclick  = function(){ stepHour(1); };
+$('mMinus').onclick = function(){ stepMinute(-1); };
+$('mPlus').onclick  = function(){ stepMinute(1); };
+
+/* 拖動指針：長針會對齊每一格（簡單 30 分、進階 5 分、困難 1 分），短針對齊到最近的「時」 */
+let dragging = null;
+function svgAngle(e){
+  const pt = clock.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+  const p = pt.matrixTransform(clock.getScreenCTM().inverse());
+  let a = Math.atan2(p.x - CX, -(p.y - CY)) * 180 / Math.PI;
+  return a < 0 ? a + 360 : a;
+}
+clock.addEventListener('pointerdown', function(e){
+  if(mode!=='set' || locked || !e.target.dataset.hand) return;
+  dragging = e.target.dataset.hand; clock.classList.add('dragging');
+  clock.setPointerCapture(e.pointerId); e.preventDefault();
+});
+clock.addEventListener('pointermove', function(e){
+  if(!dragging) return;
+  const a = svgAngle(e);
+  if(dragging==='m'){
+    const st = LEVELS[level].step;
+    moveMinute((Math.round(a/6/st)*st) % 60);
+  }else{
+    const h = Math.floor(a/30) || 12;
+    if(h !== setH){ setH = h; setHands(clock, setH, setM); updateSetLabels(); sTick(); }
+  }
+});
+function endDrag(){ dragging = null; clock.classList.remove('dragging'); }
+clock.addEventListener('pointerup', endDrag);
+clock.addEventListener('pointercancel', endDrag);
+
+$('setGo').onclick = function(){
+  if(locked) return;
+  if(setH===q.h && setM===q.m){ win(null); return; }
+  if(!q.retry){
+    q.retry = true;
+    oops(pick(COMFORT) + '看看提示，再調一次！', setHint(q));
+  }else{
+    lose();
+  }
+};
+
+/* ----- 答對、答錯 ----- */
+function win(btn){
+  locked = true;
+  if(btn) btn.classList.add('right');
+  if(mode==='set') setHands(clock, q.h, q.m);
+  results[qi] = q.retry ? 'half' : 'ok';
+  birdSay(clock, '咕咕！', 'pop'); sCuckoo();
+  $('feedback').className = 'feedback good';
+  $('feedback').innerHTML = Z(q.retry ? '你自己找到答案了！' : pick(PRAISE));
+  done();
+}
+function oops(msg, hintHTML){
+  sSoft();
+  birdSay(clock, '加油！', 'peek');
+  clock.classList.add('show-min');
+  $('feedback').className = 'feedback warm';
+  $('feedback').innerHTML = Z(msg);
+  $('hint').innerHTML = Z(hintHTML);
+}
+function lose(){
+  locked = true;
+  results[qi] = 'miss';
+  sSoft();
+  birdSay(clock, '沒關係！', 'peek');
+  clock.classList.add('show-min');
+  if(mode==='read'){
+    Array.from($('answers').children).forEach(function(b){ if(+b.dataset.h===q.h && +b.dataset.m===q.m) b.classList.add('right'); });
+  }else{
+    setH = q.h; setM = q.m; setHands(clock, q.h, q.m); updateSetLabels();
+  }
+  $('feedback').className = 'feedback warm';
+  $('feedback').innerHTML = Z('沒關係！正確的是 ' + fmt(q.h, q.m));
+  $('hint').innerHTML = Z(LEGEND);
+  done();
+}
+function done(){
+  qi++;
+  renderPins();
+  $('nextBtn').innerHTML = Z(qi >= TOTAL ? '看結果' : '下一題');
+  $('nextBtn').hidden = false;
+  $('nextBtn').focus({ preventScroll:true });
+}
+$('nextBtn').onclick = function(){ nextQ(); };
+$('backBtn').onclick = function(){ clearTimers(); renderHome(); show('home'); };
+
+/* ===== 結果 ===== */
+function finish(){
+  const ok = results.filter(function(r){ return r==='ok'; }).length;
+  const half = results.filter(function(r){ return r==='half'; }).length;
+  const pts = (ok + half*0.5) / TOTAL;
+  const stars = pts>=0.9 ? 3 : pts>=0.7 ? 2 : pts>=0.4 ? 1 : 0;
+  const key = mode+'-'+level;
+  if(!store.best[key] || stars > store.best[key]) store.best[key] = stars;
+  save();
+  const missed = [];
+  results.forEach(function(r,i){ if(r!=='ok') missed.push(historyQ[i]); });
+  let html = '<div class="stars">'+[0,1,2].map(function(i){ return starSVG(i<stars); }).join('')+'</div>'
+    + '<div class="r-title">'+['加油，再挑戰一次！','不錯喔！','很厲害！','你是時鐘小達人！'][stars]+'</div>'
+    + '<div class="r-line">'+MODES[mode].name+'・'+LEVELS[level].name+'　答對 '+(ok+half)+' / '+TOTAL+' 題'+(half?'（其中 '+half+' 題看了提示）':'')+'</div>';
+  if(missed.length){
+    html += '<div class="miss-list"><h3>再多看看這幾個時間</h3><div class="minis">'
+      + missed.map(function(t){ return '<div class="mini">'+miniClock(t.h,t.m)+'<span>'+fmt(t.h,t.m)+'</span></div>'; }).join('')
+      + '</div></div>';
+  }
+  html += '<div class="r-btns"><button class="plank go" id="againBtn">再玩一次</button><button class="plank" id="homeBtn">回首頁</button></div>';
+  $('resultBox').innerHTML = Z(html);
+  $('againBtn').onclick = startGame;
+  $('homeBtn').onclick = function(){ renderHome(); show('home'); };
+  show('result');
+  if(stars >= 2){ sCuckoo(); }
+}
+
+/* 記住每一題，結果頁要畫出來 */
+let historyQ = [];
+const _nextQ = nextQ;
+nextQ = function(){ _nextQ(); if(qi < TOTAL) historyQ[qi] = { h:q.h, m:q.m }; };
+const _start = startGame;
+startGame = function(){ historyQ = []; _start(); };
+$('startBtn').onclick = function(){ startGame(); };
+
+/* 鍵盤：看時鐘時按 1～4 選答案，答完按 Enter 下一題 */
+document.addEventListener('keydown', function(e){
+  if(!$('game').classList.contains('active')) return;
+  if(!$('nextBtn').hidden && (e.key==='Enter' || e.key===' ')){ e.preventDefault(); $('nextBtn').click(); return; }
+  if(mode==='read' && /^[1-4]$/.test(e.key)){ const b = $('answers').children[+e.key-1]; if(b && !b.disabled) b.click(); }
+});
+
+refreshZy();
+setInterval(function(){ if($('home').classList.contains('active')) tickNow(); }, 5000);
+</script>
+</body>
+</html>
