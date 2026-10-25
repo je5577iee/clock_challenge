@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>咕咕鐘</title>
+<title>咕咕鐘: 一起來認識時鐘</title>
 <!--
   咕咕鐘：認識時鐘的小遊戲
   - 單一 HTML 檔，完全離線可用，不引用任何外部資源
@@ -204,7 +204,7 @@ body.zy-on .fb-txt{line-height:2.2}
 .r-btns{display:flex; gap:12px; margin-top:20px}
 .r-btns .plank{flex:1; font-size:19px}
 
-/* ---------- 注音（直式，跟國語課本一樣） ---------- */
+/* ---------- 注音（直式） ---------- */
 .zc{display:inline-flex; align-items:center; white-space:nowrap; text-indent:0}
 .zp{position:relative; display:inline-flex; flex-direction:column; align-items:center; justify-content:center;
   font-size:max(.32em, 8px); line-height:1.05; letter-spacing:0; margin:0 .6em 0 .12em; font-weight:700}
@@ -241,7 +241,7 @@ body.zy-on .sign h1{letter-spacing:2px}
         <p class="tap-tip" data-zy="">👆 點一下時鐘，小鳥會跑出來喔！</p>
       </div>
       <div class="choose">
-        <button class="plank lesson-btn" id="lessonBtn"><svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true"><path d="M20 10 C14 6 8 6 4 8 V32 C8 30 14 30 20 34 C26 30 32 30 36 32 V8 C32 6 26 6 20 10Z" fill="#fffaf0" stroke="#2b1d12" stroke-width="2.5" stroke-linejoin="round"/><path d="M20 10 V34" stroke="#2b1d12" stroke-width="2.5"/><circle cx="12" cy="18" r="5" fill="none" stroke="#2f6b45" stroke-width="2"/><path d="M12 18V15M12 18l2 1" stroke="#c8323c" stroke-width="1.8" stroke-linecap="round"/><path d="M24 15h8M24 20h8M24 25h6" stroke="#8a5a2e" stroke-width="2" stroke-linecap="round"/></svg><span><span class="t" data-zy="">教學單元：認識時鐘</span><span class="d" data-zy="">還不會看時鐘？先來上一堂課！</span></span></button>
+        <button class="plank lesson-btn" id="lessonBtn"><svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true"><path d="M20 10 C14 6 8 6 4 8 V32 C8 30 14 30 20 34 C26 30 32 30 36 32 V8 C32 6 26 6 20 10Z" fill="#fffaf0" stroke="#2b1d12" stroke-width="2.5" stroke-linejoin="round"/><path d="M20 10 V34" stroke="#2b1d12" stroke-width="2.5"/><circle cx="12" cy="18" r="5" fill="none" stroke="#2f6b45" stroke-width="2"/><path d="M12 18V15M12 18l2 1" stroke="#c8323c" stroke-width="1.8" stroke-linecap="round"/><path d="M24 15h8M24 20h8M24 25h6" stroke="#8a5a2e" stroke-width="2" stroke-linecap="round"/></svg><span><span class="t" data-zy="">教學單元：認識時鐘</span><span class="d" data-zy="">一步一步學看時鐘</span></span></button>
         <h2 data-zy="">怎麼玩？</h2>
         <div class="opts two" id="modeOpts"></div>
         <h2 data-zy="">選難度</h2>
@@ -309,11 +309,11 @@ body.zy-on .sign h1{letter-spacing:2px}
   <!-- 意見回饋 -->
   <div class="fb-modal" id="fbModal" hidden>
     <div class="panel fb-box">
-      <p class="prompt" data-zy="">有什麼想法嗎？告訴我們！</p>
+      <p class="prompt" data-zy="">有什麼想法嗎？歡迎告訴我們！</p>
       <p class="fb-txt" data-zy="">好玩的地方、看不懂的地方、哪裡怪怪的，都可以寫下來。</p>
       <p class="fb-txt warn" data-zy="">請不要寫下名字、學校、電話這些個人資料喔！</p>
       <p class="fb-txt small" data-zy="">按下去會打開一個新的網頁表單，需要網路。</p>
-      <div class="fb-btns"><button class="plank" id="fbClose" data-zy="">先不要</button><a class="plank go" id="fbGo" target="_blank" rel="noopener noreferrer" data-zy="">去寫回饋</a></div>
+      <div class="fb-btns"><button class="plank" id="fbClose" data-zy="">先不要</button><a class="plank go" id="fbGo" target="_blank" rel="noopener noreferrer" data-zy="">我要填寫</a></div>
       <p class="fb-txt small" id="fbNone" hidden data-zy="">（回饋表單還沒設定好）</p>
     </div>
   </div>
@@ -331,7 +331,7 @@ body.zy-on .sign h1{letter-spacing:2px}
    ===================================================================== */
 const TOTAL = 10;   // 一回幾題
 /* 意見回饋：Google 表單的網址貼在這裡（留空的話，按鈕會顯示「還沒設定好」） */
-const FEEDBACK_URL = 'https://docs.google.com/forms/d/e/1FAIpQLScruXKEE6PUyAwbKz_pbW9mjBErlOV1vO_DhMaotHZZjbhuhg/viewform';
+const FEEDBACK_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfmO3jea2-kdY5NfqL5oiTMo6KFmHi2Pe4487vLqqDn4fIZhg/viewform';
 const LEVELS = {
   easy: { name:'簡單', desc:'整點和半點', step:30 },
   mid:  { name:'進階', desc:'5 分 5 分看', step:5 },
@@ -964,14 +964,14 @@ const LESSON = [
     acts:[{ n:'3 時', run:function(){ lSet(3, 0); lRead('長針指著 12，短針指著 3：3 時'); } },
           { n:'3 時 30 分', run:function(){ lGlide(3, 0, 3, 30, reduceMotion ? 0 : 1500, null, function(){ lRead('長針指著 6 是 30 分；短針在 3 和 4 的中間，還沒到 4，所以是 3 時 30 分'); }); } }] },
   { t:'8. 怎麼看幾時幾分？',
-    x:'先看'+H('短針')+'：它<b>剛走過</b>哪個數字，就是幾時。再看'+M('長針')+'：5 個 5 個數，再加上多走的小格，就是幾分。',
-    setup:function(){ lSet(4, 22); lc.classList.add('show-min'); lRead('這是幾時幾分呢？按「一步一步看」'); },
+    x:'先看'+H('短針')+'：它<b>剛走過</b>哪個數字，就是幾時。再看'+M('長針')+'：5 個 5 個數，再加上多走的小格，就是幾分。<br> (這裡用5時22分來示範)',
+    setup:function(){ lSet(5, 22); lc.classList.add('show-min'); lRead('這是幾時幾分呢？按「一步一步看」'); },
     acts:[{ n:'一步一步看', run:function(){
-      lc.classList.remove('glow-h','glow-m','dim-h','dim-m'); lSet(4, 22);
-      lLater(function(){ lc.classList.add('glow-h','dim-m'); lRead('第 1 步：'+H('短針')+'剛走過 4，還沒到 5，所以是 '+H('4 時')); sTick(); }, 300);
+      lc.classList.remove('glow-h','glow-m','dim-h','dim-m'); lSet(5, 22);
+      lLater(function(){ lc.classList.add('glow-h','dim-m'); lRead('第 1 步：'+H('短針')+'剛走過 5，還沒到 6，所以是 '+H('5 時')); sTick(); }, 300);
       lLater(function(){ lc.classList.remove('glow-h','dim-m'); lc.classList.add('glow-m','dim-h'); for(let i=1;i<=20;i++) litTick(i); lRead('第 2 步：'+M('長針')+'走過 4，5 個 5 個數是 20 分'); sTick(); }, 2600);
       lLater(function(){ litTick(21); litTick(22); lRead('第 3 步：再多走 2 小格，20 + 2 = '+M('22 分')); sTick(); }, 5000);
-      lLater(function(){ lc.classList.remove('glow-m','dim-h'); lRead('合起來就是 '+H('4 時')+' '+M('22 分')+'！'); sCuckoo(); birdSay(lc, '咕咕！', 'pop'); }, 7200);
+      lLater(function(){ lc.classList.remove('glow-m','dim-h'); lRead('合起來就是 '+H('5 時')+' '+M('22 分')+'！'); }, 7200);
     } }] },
   { t:'9. 自己撥撥看',
     x:'用手指或滑鼠<b>拖動指針</b>（點外圈撥長針、點靠近中間撥短針），也可以按下面的按鈕，時鐘會告訴你現在是幾時幾分。走到整點的時候，咕咕會跑出來喔！',
